@@ -1,11 +1,20 @@
 '''
-tkSpeedometer.0.1.py
+tkSpeedometer.1.0.py
 Thomas Kutschera
 feb 2021
 
 Help
 --------------------------------------------------------------
-Animate visibility in a row
+Usage:
+---------
+1. Select the objects, you want the speed get measured.  
+2. "Create Speedometer On Selected Objects" sets up the scene. 
+    A HUD should appear in your viewport.
+-  "Clear HUD" removes the HUD.
+-  "HUD" adds the HUD again.
+---------
+The information is stored in the group "speed_lc_grp".
+To remove all clear the HUD first, then delete the "speed_lc_grp".
 		
 '''		
 from functools import partial 
@@ -15,39 +24,53 @@ import colorsys
 import random
 
 
+def cHelp(*args):
+	if cmds.window('win_tk_helpHouseBuilder', exists=1):
+			cmds.deleteUI('win_tk_helpHouseBuilder')
+	myWindow = cmds.window('win_tk_helpHouseBuilder', s=1, t='help', wh=(200, 200))
+
+	helpText = '\nUsage:\n---------\n1. Select the objects, you want the speed get measured.  \n2. "Create Speedometer On Selected Objects" sets up the scene. \n    A HUD should appear in your viewport.\n-  "Clear HUD" removes the HUD.\n-  "HUD" adds the HUD again.\n---------\nThe information is stored in the group "speed_lc_grp".\nTo remove all clear the HUD first, then delete the "speed_lc_grp". \n'
+
+	cmds.columnLayout(adj=1)
+	cmds.text(helpText, al='left')
+	cmds.showWindow(myWindow)
 
 
 def cCreateSpeedometer(*args):
 	grp = 'speed_lc_grp'
 	lc 	= '_SLC'
-	obj = cmds.ls(sl=1, l=1)[0]
+	objs = cmds.ls(sl=1, l=1)
 
-	if not cmds.objExists('speed_lc_grp'):
-		grp = cmds.group(empty=1, n='speed_lc_grp')
+	for obj in objs:
+		if not cmds.objExists('speed_lc_grp'):
+			grp = cmds.group(empty=1, n='speed_lc_grp')
+			cmds.setAttr(grp + '.visibility', 0)
 
-	if not cmds.objExists(obj + '_SLC'):
-		objSrt = obj.split('|')[-1]
-		lc = cmds.spaceLocator(n=objSrt + '_SLC',p=(0, 0,0))
-		print lc
+		if not cmds.objExists(obj + '_SLC') and len(objs) > 0:
+			objShort = obj.split('|')[-1]
+			if not cmds.objExists(objShort + '_SLC'):
+				lc = cmds.spaceLocator(n=objShort + '_SLC',p=(0, 0,0))
 
-		matrix = cmds.createNode('pointMatrixMult')
-		cmds.connectAttr(obj + '.parentMatrix[0]', matrix + '.inMatrix')
-		cmds.connectAttr(obj + '.translate', matrix + '.inPoint')
-		cmds.connectAttr(matrix + '.output', lc[0] + '.translate')
+				matrix = cmds.createNode('pointMatrixMult')
+				cmds.connectAttr(obj + '.parentMatrix[0]', matrix + '.inMatrix')
+				cmds.connectAttr(obj + '.translate', matrix + '.inPoint')
+				cmds.connectAttr(matrix + '.output', lc[0] + '.translate')
 
-		cmds.parent(lc, grp)
+				cmds.parent(lc, grp)
 
-		cmds.addAttr(lc, ln='kmPerHour', at='double', dv=0)
-		cmds.setAttr(lc[0] + '.kmPerHour', e=1, k=1)
-		cmds.addAttr(lc, ln='milesPerHour', at='double', dv=0)
-		cmds.setAttr(lc[0] + '.milesPerHour', e=1, k=1)
+				cmds.addAttr(lc, ln='kmPerHour', at='double', dv=0)
+				cmds.setAttr(lc[0] + '.kmPerHour', e=1, k=1)
+				cmds.addAttr(lc, ln='milesPerHour', at='double', dv=0)
+				cmds.setAttr(lc[0] + '.milesPerHour', e=1, k=1)
 
-		exString = cExString(matrix, lc)
-		print exString
+				exString = cExString(matrix, lc)
 
-		cmds.expression(n="ex" + lc[0], s=exString, o="", ae=1, uc='all')
+				cmds.expression(n="ex" + lc[0], s=exString, o="", ae=1, uc='all')
 
-		cmds.headsUpMessage('speedometer created!')
+				cmds.headsUpMessage('speedometer created!')
+
+				cmds.select(clear=1)
+				cSpeedHud(1)
 
 
 
@@ -76,18 +99,10 @@ def cExString(matrix, lc, *args):
 
 
 def cExStringHudUpdate(lc, *args):
-	print lc
-	exString  = 'if (`objExists ' + str(lc) + '"` == true)\n'
+	exString  = 'if (`objExists "' + str(lc) + '"` == true)\n'
 	exString += '\theadsUpDisplay -r headsUp' + str(lc) + ';'
-
 	return exString
 
-
-def cGetTime(lc):
-	myTime = cmds.currentTime(q=1)
-	print lc
-	# return str(lc)
-	return str(myTime)
 
 
 def cSpeedHud(state, *args):
@@ -101,13 +116,15 @@ def cSpeedHud(state, *args):
 
 		if cmds.objExists('speed_lc_grp'):
 			lcs = cmds.listRelatives('speed_lc_grp', c=1)
+			block = 0 
 
 			for lc in lcs:
-				print lc
-				cmds.headsUpDisplay('headsUp' + str(lc), c=partial(cReadHudContent, 1, lc), s=3, b=0, bs='small', dw=250, dfs='large', lfs='large',l=lc, event='timeChanged')
+				cmds.headsUpDisplay('headsUp' + str(lc), c=partial(cReadHudContent, 1, lc), s=3, b=block, bs='small', dw=250, dfs='large', lfs='large',l=lc, event='timeChanged')
+				if not cmds.objExists('exUpdate' + str(lc)):
+					exString = cExStringHudUpdate(lc)
+					cmds.expression(n='exUpdate' + lc, s=exString, o="", ae=1, uc='all')
 
-				exString = cExStringHudUpdate(lc)
-				cmds.expression(n='exUpdate' + lc, s=exString, o="", ae=1, uc='all')
+				block +=1
 
 
 
@@ -118,6 +135,8 @@ def cSpeedHud(state, *args):
 			for lc in lcs:
 				if cmds.headsUpDisplay('headsUp' + lc, ex=1):
 					cmds.headsUpDisplay('headsUp' + lc, rem=1)
+				if cmds.objExists('exUpdate' + str(lc)):
+					cmds.delete('exUpdate' + lc)
 
 
 def cDelExpression(*args):
@@ -126,21 +145,17 @@ def cDelExpression(*args):
 
 
 def cReadHudContent(counter, lc, *args):
-	txtHeadsUp = 'test'
-	print 'cReadHudContent...'
-	# print lc
+	txtHeadsUp = ''
 	if counter == 1:
-		hudKm		= "_kmh"
-		# hudMiles	= ' miles h'
+		hudKm		= " km/h"
+		hudMiles	= ' miles/h'
 		km			= cmds.getAttr(lc + '.kmPerHour')  
-		# miles 		= cmds.getAttr(lc + '.milesPerHour')  
-		print km
-		# txtHeadsUp	= str(km) + hudKm
+		miles 		= cmds.getAttr(lc + '.milesPerHour')  
 		txtHeadsUp	= str(km)
-		txtHeadsUp	+= " km/h"
+		txtHeadsUp	+= " km/h --- "
+		txtHeadsUp	+= str(miles)
+		txtHeadsUp	+= " miles/h"
 
-
-		# print txtHeadsUp
 		return txtHeadsUp
 
 
@@ -149,13 +164,8 @@ def tkSpeedometer():
 	colRed				= [0.44, 0.28, 0.28];
 	colGreen			= [0.28, 0.44, 0.28];
 	colGreen2			= [0.18, 0.30, 0.18];
-	colGreen3			= [0.08, 0.20, 0.08];
-	colBlack			= [0.00, 0.00, 0.00];
-	colSilverLight 		= [0.35, 0.42, 0.47];
-	colSilverDark 		= [0.08, 0.09, 0.10];
-	colSilverMid 		= [0.23, 0.28, 0.30];
-	colSilverMid2 		= [0.17, 0.22, 0.24];
-	ver = '0.1'
+	colDark 		= [0.08, 0.09, 0.10];
+	ver = '1.0'
 	windowStartHeight = 50
 	windowStartWidth = 480
 	bh1 = 18
@@ -164,13 +174,16 @@ def tkSpeedometer():
 		cmds.deleteUI('win_tkSpeedometer')
 	myWindow = cmds.window('win_tkSpeedometer', t=('win_tkSpeedometer ' + ver), s=1)
 
-	cmds.columnLayout(adj=1, bgc=(colGreen3[0], colGreen3[1], colGreen3[2]))
+	cmds.columnLayout(adj=1, bgc=(colDark[0], colDark[1], colDark[2]))
 	cmds.rowColumnLayout(nc=3, cw=[(1, 240), (2, 120), (3,120)])
 
 	cmds.button(l='Create Speedometer on Selected Object', c=partial(cCreateSpeedometer), bgc=(colGreen[0], colGreen[1], colGreen[2]))
 	cmds.button(l='HUD', c=partial(cSpeedHud, 1), bgc=(colGreen2[0], colGreen2[1], colGreen2[2]))
 	cmds.button(l='Clear HUD', c=partial(cSpeedHud, 0), bgc=(colRed[0], colRed[1], colRed[2]))
-	cmds.button(l='Delet Expressions', c=partial(cDelExpression), bgc=(colRed[0], colRed[1], colRed[2]))
+	# cmds.button(l='Delete Expressions', c=partial(cDelExpression), bgc=(colRed[0], colRed[1], colRed[2]))
+
+	cmds.setParent('..')
+	cmds.button(l='Help', c=partial(cHelp), bgc=(colDark[0], colDark[1], colDark[2]))
 	
 	cmds.showWindow(myWindow)
 
