@@ -1,138 +1,180 @@
-// speedometer.1.5.mel
+'''
+tkSpeedometer.0.1.py
+Thomas Kutschera
+feb 2021
+
+Help
+--------------------------------------------------------------
+Animate visibility in a row
+		
+'''		
+from functools import partial 
+import maya.cmds as cmds
+import maya.mel as mel
+import colorsys
+import random
 
 
-global proc cShrinkWin(string $windowToClose)
-{
-	window -e -h 20 $windowToClose;
-	window -e -w 280 $windowToClose;
-}
 
-global proc cSpeedometer()
-{
-	$mySel = `ls -sl`;
-	string $flyer = $mySel[0];
+
+def cCreateSpeedometer(*args):
+	grp = 'speed_lc_grp'
+	lc 	= '_SLC'
+	obj = cmds.ls(sl=1, l=1)[0]
+
+	if not cmds.objExists('speed_lc_grp'):
+		grp = cmds.group(empty=1, n='speed_lc_grp')
+
+	if not cmds.objExists(obj + '_SLC'):
+		objSrt = obj.split('|')[-1]
+		lc = cmds.spaceLocator(n=objSrt + '_SLC',p=(0, 0,0))
+		print lc
+
+		matrix = cmds.createNode('pointMatrixMult')
+		cmds.connectAttr(obj + '.parentMatrix[0]', matrix + '.inMatrix')
+		cmds.connectAttr(obj + '.translate', matrix + '.inPoint')
+		cmds.connectAttr(matrix + '.output', lc[0] + '.translate')
+
+		cmds.parent(lc, grp)
+
+		cmds.addAttr(lc, ln='kmPerHour', at='double', dv=0)
+		cmds.setAttr(lc[0] + '.kmPerHour', e=1, k=1)
+		cmds.addAttr(lc, ln='milesPerHour', at='double', dv=0)
+		cmds.setAttr(lc[0] + '.milesPerHour', e=1, k=1)
+
+		exString = cExString(matrix, lc)
+		print exString
+
+		cmds.expression(n="ex" + lc[0], s=exString, o="", ae=1, uc='all')
+
+		cmds.headsUpMessage('speedometer created!')
+
+
+
+def cExString(matrix, lc, *args):
+	exString  = 'float $read;\n'
+	exString += '$obj1 = "' + matrix + '";\n'
 	
-	if (objExists ("SpeedoPointMatrixMult.inMatrix") == false)
-		createNode pointMatrixMult -n "SpeedoPointMatrixMult";
-		
-	if (objExists ("SpeedoPointMatrixMult") == true)
-	{
-
-		connectAttr -f ($flyer + ".worldMatrix[0]") ("SpeedoPointMatrixMult.inMatrix");
-		addAttr -ln "kmPerHour" -at double -dv 0 ("SpeedoPointMatrixMult");
-		setAttr -e -keyable true ("SpeedoPointMatrixMult.kmPerHour");
-		addAttr -ln "milesPerHour" -at double -dv 0 ("SpeedoPointMatrixMult");
-		setAttr -e -keyable true ("SpeedoPointMatrixMult.milesPerHour");
-
-		{
-			expression -n "exSpeedo" -s "if (`objExists SpeedoPointMatrixMult` == true)\n{\n\t$obj1 = \"SpeedoPointMatrixMult\";\n\t\n\tint $timex = (`currentTime -query`) -1;\n\t\n\tfloat $x = `getAttr ($obj1 + \".outputX\")`;\n\tfloat $y = `getAttr ($obj1 + \".outputY\")`;\n\tfloat $z = `getAttr ($obj1 + \".outputZ\")`;\n\t\n\tfloat $x1 = `getAttr -t $timex ($obj1 + \".outputX\")`;\n\tfloat $y1 = `getAttr -t $timex ($obj1 + \".outputY\")`;\n\tfloat $z1 = `getAttr -t $timex ($obj1 + \".outputZ\")`;\n\t\n\t$read = mag( << $x-$x1,  $y-$y1,  $z-$z1  >> );\n\t\n\tfloat $read = $read *24 *60 *60;\n\t\n\tSpeedoPointMatrixMult.kmPerHour = int($read/100000); \n\tSpeedoPointMatrixMult.milesPerHour = int($read/100000 * 0.621371);\n}"  -o "" -ae 1 -uc all ;
-		}
-		
-		headsUpMessage ("Speedometer created!");
-	}
-	else
-		headsUpMessage ("Speedometer already there");
-}
-
-global proc cSpeedHud(int $state)
-{
-	if ($state == 1)	// add Hud
-	{
-		headsUpDisplay -rp 3 0;
-		headsUpDisplay -rp 3 1;
-		headsUpDisplay -rp 3 2;
-		headsUpDisplay -rp 3 3;
-		headsUpDisplay -rp 3 4;
-		headsUpDisplay -rp 3 5;
-		
-		if (`objExists ("SpeedoPointMatrixMult.inMatrix")` == true){
-			print "\n speed";
-			headsUpDisplay -s 3 -b 0 -bs "small" -dw 250 -dfs "large" -lfs "large" -l "dra_01" -c "cReadHudContent(1)" -event "timeChanged" dra01HeadsUp;
-		}
-		
-		
-		if (`objExists ("exUpdateHUD")` == false)
-			expression -n "exUpdateHUD" -s "if (`objExists \"SpeedoPointMatrixMult\"` == true)\n{\n\theadsUpDisplay -r dra01HeadsUp;\n\n   if (`objExists \"camHUD:camHUD\"` == true)\n{\n\theadsUpDisplay -r camHeight;\n\theadsUpDisplay -r camTilt;\n\theadsUpDisplay -r camFocalLength;\n}"  -o "" -ae 1 -uc all ;
-
-
-	}
-		
-	if ($state == 0)	// remove Hud 
-	{
-		if (`headsUpDisplay -ex dra01HeadsUp`)
-		{
-			headsUpDisplay -remove dra01HeadsUp;
-			headsUpDisplay -remove dra01HeadsUpHeight;
-		}
-			
-			
-		if (`objExists ("exUpdateHUD")` == true)
-		{
-			delete exUpdateHUD;
-		}
-	}
-
-
+	exString += 'int $timex = (`currentTime -query`) -1;\n'
 	
-}
+	exString += 'float $x = `getAttr ($obj1 + ".outputX")`;\n'
+	exString += 'float $y = `getAttr ($obj1 + ".outputY")`;\n'
+	exString += 'float $z = `getAttr ($obj1 + ".outputZ")`;\n'
+	
+	exString += 'float $x1 = `getAttr -t $timex ($obj1 + ".outputX")`;\n'
+	exString += 'float $y1 = `getAttr -t $timex ($obj1 + ".outputY")`;\n'
+	exString += 'float $z1 = `getAttr -t $timex ($obj1 + ".outputZ")`;\n'
+	
+	exString += '$read = mag( << $x-$x1,  $y-$y1,  $z-$z1  >> );\n'
+	
+	exString += '$read = $read *24 *60 *60;\n'
+	exString += lc[0] + '.kmPerHour = int($read/100000);\n'
+	exString += lc[0] + '.milesPerHour = int($read/100000 * 0.621371);\n'
 
-global proc string cReadHudContent(int $counter)
-{
-	// global string $dra01HeadsUp;
-	// global string $dra02HeadsUp;
-	// global string $dra03HeadsUp;
-
-	if ($counter == 1)	// dra_01
-	{
-		$hudKm = " km/h, ";
-		$hudMiles = " miles/h ";
-		int $km1 = `getAttr ("SpeedoPointMatrixMult.kmPerHour")`;
-		int $miles1 = `getAttr ("SpeedoPointMatrixMult.milesPerHour")`;
-		string $dra01HeadsUp = (($km1) + ($hudKm) + ($miles1) + ($hudMiles));
-		string $dra01HeadsUp = (($miles1) + ($hudMiles));
-		
-		return $dra01HeadsUp;
-	}
+	return exString
 	
 
+
+def cExStringHudUpdate(lc, *args):
+	print lc
+	exString  = 'if (`objExists ' + str(lc) + '"` == true)\n'
+	exString += '\theadsUpDisplay -r headsUp' + str(lc) + ';'
+
+	return exString
+
+
+def cGetTime(lc):
+	myTime = cmds.currentTime(q=1)
+	print lc
+	# return str(lc)
+	return str(myTime)
+
+
+def cSpeedHud(state, *args):
+	if state == 1:
+		cmds.headsUpDisplay(rp=(3, 0))
+		cmds.headsUpDisplay(rp=(3, 1))
+		cmds.headsUpDisplay(rp=(3, 2))
+		cmds.headsUpDisplay(rp=(3, 3))
+		cmds.headsUpDisplay(rp=(3, 4))
+		cmds.headsUpDisplay(rp=(3, 5))
+
+		if cmds.objExists('speed_lc_grp'):
+			lcs = cmds.listRelatives('speed_lc_grp', c=1)
+
+			for lc in lcs:
+				print lc
+				cmds.headsUpDisplay('headsUp' + str(lc), c=partial(cReadHudContent, 1, lc), s=3, b=0, bs='small', dw=250, dfs='large', lfs='large',l=lc, event='timeChanged')
+
+				exString = cExStringHudUpdate(lc)
+				cmds.expression(n='exUpdate' + lc, s=exString, o="", ae=1, uc='all')
+
+
+
+	if state == 0:
+		if cmds.objExists('speed_lc_grp'):
+			lcs = cmds.listRelatives('speed_lc_grp', c=1)
+
+			for lc in lcs:
+				if cmds.headsUpDisplay('headsUp' + lc, ex=1):
+					cmds.headsUpDisplay('headsUp' + lc, rem=1)
+
+
+def cDelExpression(*args):
+	ex = cmds.ls(type='expression')
+	cmds.delete(ex)
+
+
+def cReadHudContent(counter, lc, *args):
+	txtHeadsUp = 'test'
+	print 'cReadHudContent...'
+	# print lc
+	if counter == 1:
+		hudKm		= "_kmh"
+		# hudMiles	= ' miles h'
+		km			= cmds.getAttr(lc + '.kmPerHour')  
+		# miles 		= cmds.getAttr(lc + '.milesPerHour')  
+		print km
+		# txtHeadsUp	= str(km) + hudKm
+		txtHeadsUp	= str(km)
+		txtHeadsUp	+= " km/h"
+
+
+		# print txtHeadsUp
+		return txtHeadsUp
+
+
+
+def tkSpeedometer():
+	colRed				= [0.44, 0.28, 0.28];
+	colGreen			= [0.28, 0.44, 0.28];
+	colGreen2			= [0.18, 0.30, 0.18];
+	colGreen3			= [0.08, 0.20, 0.08];
+	colBlack			= [0.00, 0.00, 0.00];
+	colSilverLight 		= [0.35, 0.42, 0.47];
+	colSilverDark 		= [0.08, 0.09, 0.10];
+	colSilverMid 		= [0.23, 0.28, 0.30];
+	colSilverMid2 		= [0.17, 0.22, 0.24];
+	ver = '0.1'
+	windowStartHeight = 50
+	windowStartWidth = 480
+	bh1 = 18
+
+	if (cmds.window('win_tkSpeedometer', exists=1)):
+		cmds.deleteUI('win_tkSpeedometer')
+	myWindow = cmds.window('win_tkSpeedometer', t=('win_tkSpeedometer ' + ver), s=1)
+
+	cmds.columnLayout(adj=1, bgc=(colGreen3[0], colGreen3[1], colGreen3[2]))
+	cmds.rowColumnLayout(nc=3, cw=[(1, 240), (2, 120), (3,120)])
+
+	cmds.button(l='Create Speedometer on Selected Object', c=partial(cCreateSpeedometer), bgc=(colGreen[0], colGreen[1], colGreen[2]))
+	cmds.button(l='HUD', c=partial(cSpeedHud, 1), bgc=(colGreen2[0], colGreen2[1], colGreen2[2]))
+	cmds.button(l='Clear HUD', c=partial(cSpeedHud, 0), bgc=(colRed[0], colRed[1], colRed[2]))
+	cmds.button(l='Delet Expressions', c=partial(cDelExpression), bgc=(colRed[0], colRed[1], colRed[2]))
 	
-	print "\n next frame";
-}
+	cmds.showWindow(myWindow)
 
+tkSpeedometer()
+# cmds.window('win_tkSpeedometer', e=1, h=60)
+cmds.window('win_tkSpeedometer', e=1, w=480, h=40, s=1)
 
-
-
-///////////////////// window ////////////////////////////
-global proc tk_speedometer()
-{
-
-$ver = "v1.5";
-int $windowStartHeight = 50;
-int $windowStartWidth = 280;
-int $bh1 = 18;
-int $bh2 = 22;
-
-$nucEnable = 0;
-$nucStartFrame = 1;
-$nucSubstep = 4; 
-$nucCollSubstep = 3; 
-
-if( `window -exists win_tk_speedometer` )
-	deleteUI win_tk_speedometer;
-
-$myWindow = `window -title ("Speedometer " + $ver) -s 1 -wh $windowStartHeight $windowStartWidth win_tk_speedometer`;
-
-/* -------------------- windowStart ------------------------- */
-
-	
-columnLayout -adj 1;		
-	rowColumnLayout -nc 3 -cw 1 160 -cw 2 60 -cw 3 60;
-		button -h $bh1 -l "Create Speedometer" -bgc .4 .3 .3  -c "cSpeedometer";
-		button -h $bh1 -l "HUD" -c "cSpeedHud(1)";
-		button -h $bh1 -l "Clear HUD" -c "cSpeedHud(0)";
-		setParent..;
-		
-		showWindow $myWindow;
-}
-tk_speedometer;
-cShrinkWin("win_tk_speedometer");
