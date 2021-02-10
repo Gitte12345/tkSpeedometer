@@ -1,5 +1,5 @@
 '''
-tkSpeedometer.1.2.py
+tkSpeedometer.1.3.py
 Thomas Kutschera
 feb 2021
 
@@ -119,8 +119,8 @@ def cExString(matrix, lc, sceneScale, *args):
 	exString += '$read = mag( << $x-$x1,  $y-$y1,  $z-$z1  >> );\n'
 	
 	exString += '$read = $read *24 *60 *60;\n'
-	exString += lc[0] + '.kmPerHour = float(int($read /100000 * $sceneScale *$decimals ))/$decimals;\n'
-	exString += lc[0] + '.milesPerHour = float(int($read /100000 * 0.621371 * $sceneScale *$decimals))/$decimals;\n'
+	exString += lc[0] + '.kmPerHour = float(int($read /100000 / $sceneScale *$decimals ))/$decimals;\n'
+	exString += lc[0] + '.milesPerHour = float(int($read /100000 * 0.621371 / $sceneScale *$decimals))/$decimals;\n'
 
 	return exString
 
@@ -235,7 +235,7 @@ def tkSpeedometer():
 	colGreen2			= [0.18, 0.30, 0.18];
 	colDark 			= [0.08, 0.09, 0.10];
 	colDark2 			= [0.02, 0.21, 0.22];
-	ver 				= '1.2'
+	ver 				= '1.3'
 	windowStartHeight 	= 50
 	windowStartWidth 	= 480
 
@@ -272,7 +272,7 @@ def tkSpeedometer():
 	cmds.setParent('..')
 	# cmds.rowColumnLayout(nc=3, cw=[(1, 240), (2, 60), (3,240)])
 	cmds.rowColumnLayout(nc=4, cw=[(1, 240), (2, 60), (3,180), (4,60)])
-	cmds.text('Scene Scale', bgc=(colGreen2[0], colGreen2[1], colGreen2[2]))
+	cmds.text('Maya Scene Scale', bgc=(colGreen2[0], colGreen2[1], colGreen2[2]))
 	cmds.floatField('fSceneScale', v=1, pre=2, min = .00001, cc=partial(cAdjustAttr, 'fSceneScale', 'sceneScale'), bgc=(colGreen[0], colGreen[1], colGreen[2]))
 	cmds.text('Decimals', bgc=(colGreen2[0], colGreen2[1], colGreen2[2]))
 	cmds.intField('iDecimals', min=0, max=2, v=1, cc=partial(cAdjustAttr, 'iDecimals', 'decimals'), bgc=(colGreen[0], colGreen[1], colGreen[2]))
