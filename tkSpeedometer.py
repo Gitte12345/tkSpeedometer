@@ -1,5 +1,5 @@
 '''
-tkSpeedometer.1.1.py
+tkSpeedometer.1.2.py
 Thomas Kutschera
 feb 2021
 
@@ -167,12 +167,14 @@ def cSpeedHud(state, *args):
 
 		cSpeedHud(0)
 
+		block = 0
+
 		if cmds.objExists('speed_lc_grp'):
 			lcs = cmds.listRelatives('speed_lc_grp', c=1)
 			section = cHUDGetPostion()
 
 			for lc in lcs:
-				cmds.headsUpDisplay('headsUp' + str(lc), c=partial(cReadHudContent, 1, lc), s=section[0], b=section[1], bs='small', dw=250, dfs='large', lfs='large',l=lc, event='timeChanged')
+				cmds.headsUpDisplay('headsUp' + str(lc), c=partial(cReadHudContent, 1, lc), s=section[0], b=section[1] + block, bs='small', dw=250, dfs='large', lfs='large',l=lc, event='timeChanged')
 				if not cmds.objExists('exUpdate' + str(lc)):
 					exString = cExStringHudUpdate(lc)
 					cmds.expression(n='exUpdate' + lc, s=exString, o="", ae=1, uc='all')
@@ -233,7 +235,7 @@ def tkSpeedometer():
 	colGreen2			= [0.18, 0.30, 0.18];
 	colDark 			= [0.08, 0.09, 0.10];
 	colDark2 			= [0.02, 0.21, 0.22];
-	ver 				= '1.1'
+	ver 				= '1.2'
 	windowStartHeight 	= 50
 	windowStartWidth 	= 480
 
